@@ -2,3 +2,4 @@
 **/.cph/
 **/.cph-ng/
 **/Release/
+.clang-format

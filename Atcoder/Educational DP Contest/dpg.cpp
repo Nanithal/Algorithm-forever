@@ -40,35 +40,84 @@ const ll INFF = 0x3f3f3f3f3f3f3f3f;
 
 // DFS + 记忆化搜索的dp
 // dp[u]指的是从顶点u出发的最长路径长度
-int dp[N], n, m;
+// int dp[N], n, m;
+// vector<int> e[N];
+// int dfs(int u)
+// {
+//   if (dp[u] != -1)
+//     return dp[u];
+//   dp[u] = 0;
+//   for (int v : e[u])
+//     dp[u] = max(dp[u], dfs(v) + 1);
+//   return dp[u];
+// }
+// void init()
+// {
+//   for (int i = 1; i <= n; i++)
+//     dp[i] = -1;
+// }
+// void solve1()
+// {
+//   cin >> n >> m;
+//   for (int i = 1; i <= m; i++)
+//   {
+//     int u, v;
+//     cin >> u >> v;
+//     e[u].push_back(v);
+//   }
+//   init();
+//   int ans = 0;
+//   for (int i = 1; i <= n; i++)
+//     ans = max(ans, dfs(i));
+//   cout << ans << endl;
+// }
+
+// dp[u]代表以顶点u为终点的最长路径长度
+// dp[v] = max(do[v], dp[u] + 1)
+// +拓扑排序
 vector<int> e[N];
-int dfs(int u)
-{
-  if (dp[u] != -1)
-    return dp[u];
-  dp[u] = 0;
-  for (int v : e[u])
-    dp[u] = max(dp[u], dfs(v) + 1);
-  return dp[u];
-}
-void init()
+int indeg[N], dp[N];
+int n, m;
+queue<int> q;
+void push_queue()
 {
   for (int i = 1; i <= n; i++)
-    dp[i] = -1;
+  {
+    if (indeg[i] == 0)
+      q.push(i);
+  }
 }
-void solve1()
+void solve2()
 {
   cin >> n >> m;
+
   for (int i = 1; i <= m; i++)
   {
     int u, v;
     cin >> u >> v;
     e[u].push_back(v);
+    indeg[v]++;
   }
-  init();
+  push_queue();
   int ans = 0;
-  for (int i = 1; i <= n; i++)
-    ans = max(ans, dfs(i));
+  while (!q.empty())
+  {
+    int u = q.front();
+    q.pop();
+
+    for (int v : e[u])
+    {
+      // DAG上的最长路径dp
+      dp[v] = max(dp[v], dp[u] + 1);
+
+      // 拓扑排序
+      indeg[v]--;
+
+      if (indeg[v] == 0)
+        q.push(v);
+    }
+    ans = max(ans, dp[u]);
+  }
   cout << ans << endl;
 }
 
@@ -80,7 +129,7 @@ int main()
   // cin >> t;
   while (t--)
   {
-    solve1();
+    solve2();
   }
   return 0;
 }

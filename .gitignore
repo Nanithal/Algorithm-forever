@@ -3,3 +3,21 @@
 **/.cph-ng/
 **/Release/
 .clang-format
+
+# Local build output, dependencies, caches and secrets
+*.exe
+*.out
+*.o
+*.obj
+*.pdb
+*.ilk
+node_modules/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+
+# Full statistics implementation lives on the automation branch
+/scripts/oj-stats/
+/stats/oj-stats.json
+

@@ -1,0 +1,26 @@
+name: Update OJ statistics
+
+on:
+  schedule:
+    - cron: '17 0 * * *' # 北京时间每天 08:17
+  workflow_dispatch:
+    inputs:
+      full:
+        description: '重新扫描完整历史'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: oj-stats
+  cancel-in-progress: false
+
+jobs:
+  update:
+    uses: Nanithal/Algorithm-forever/.github/workflows/update-oj-stats.yml@automation
+    with:
+      full: ${{ inputs.full || false }}
+    secrets: inherit
+

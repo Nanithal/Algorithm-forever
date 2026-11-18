@@ -1,0 +1,73 @@
+name: Run OJ statistics from automation
+
+on:
+  workflow_call:
+    inputs:
+      full:
+        type: boolean
+        default: false
+    secrets:
+      LUOGU_COOKIE:
+        required: false
+      ATCODER_COOKIE:
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out automation tools
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: automation
+          path: automation
+      - name: Check out the algorithm branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          path: main
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Test statistics integration
+        working-directory: automation
+        run: node --test scripts/oj-stats/update.test.mjs
+      - name: Fetch submissions and update main README
+        id: update
+        working-directory: automation
+        continue-on-error: true
+        env:
+          LUOGU_COOKIE: ${{ secrets.LUOGU_COOKIE }}
+          ATCODER_COOKIE: ${{ secrets.ATCODER_COOKIE }}
+          FULL_SCAN: ${{ inputs.full }}
+        shell: bash
+        run: |
+          args=()
+          if [ "$FULL_SCAN" = "true" ]; then args+=(--full); fi
+          node scripts/oj-stats/update.mjs --readme ../main/README.md --state stats/oj-stats.json "${args[@]}"
+      - name: Save cache on automation
+        working-directory: automation
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- stats/oj-stats.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'chore: update OJ statistics cache'
+          git push origin HEAD:automation
+      - name: Save README on main
+        working-directory: main
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- README.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'docs: update OJ statistics'
+          git push origin HEAD:main
+      - name: Report platform errors
+        if: steps.update.outcome == 'failure'
+        run: exit 1
+

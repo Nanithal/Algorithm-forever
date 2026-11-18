@@ -1,0 +1,8 @@
+{
+  "name": "algorithm-forever-oj-stats",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-only",
+  "engines": { "node": ">=24" },
+  "scripts": { "test": "node --test update.test.mjs" }
+}

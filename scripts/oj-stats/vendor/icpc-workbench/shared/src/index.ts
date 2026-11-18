@@ -1,0 +1,978 @@
+// 跨端共享类型与常量（server / client 通过相对路径 import）
+// 1.2 阶段会扩展 Submission / Problem / Plan 等数据结构。
+
+// 仅类型引用：本模块反向 re-export difficulty.ts，用 import type 避免运行时循环依赖
+import type { DifficultyScale } from './difficulty.ts';
+
+export type PlatformId = 'codeforces' | 'atcoder' | 'luogu' | 'nowcoder' | 'daimayuan' | 'leetcode' | 'jisuanke' | 'qoj' | 'dashoj' | 'pta' | 'vjudge';
+
+export type PlatformSync = 'auto' | 'cookie' | 'manual';
+
+export interface PlatformMeta {
+  id: PlatformId;
+  name: string;
+  nameEn: string;
+  hasOfficialApi: boolean;
+  homepage: string;
+  /** 刷题数据获取方式：auto=公开 API 自动同步；cookie=需配置登录 Cookie 后自动同步；manual=仅手动导入 */
+  sync: PlatformSync;
+  /** 是否提供公开题库拉取（QOJ 无：/problems 需 cf_clearance 且无难度字段） */
+  hasBank: boolean;
+  /** 难度所属标度（前端展示与说明用） */
+  difficultyScale: DifficultyScale;
+  /** 提交来源：contest=比赛内提交；practice=自由练题/题库提交；none=不适用 */
+  syncSources: Array<'contest' | 'practice' | 'none'>;
+  /**
+   * 适配器可由登录凭据**反查账号**（PlatformAdapter.identify）。
+   *
+   * 用于决定设置页是否渲染「识别账号」按钮：账号名是一串用户抄不对的 id、
+   * 而站点又提供「当前登录用户」接口的平台（PTA 的 19 位数字 userId）才需要。
+   * 缺省 false —— 不声明的平台不渲染按钮，避免每个平台上都放一个必然失败的按钮。
+   */
+  identify?: boolean;
+}
+
+export const PLATFORMS: PlatformMeta[] = [
+  { id: 'codeforces', name: 'Codeforces', nameEn: 'Codeforces', hasOfficialApi: true, homepage: 'https://codeforces.com', sync: 'auto', hasBank: true, difficultyScale: 'cf-rating', syncSources: ['none'] },
+  { id: 'atcoder', name: 'AtCoder', nameEn: 'AtCoder', hasOfficialApi: false, homepage: 'https://atcoder.jp', sync: 'auto', hasBank: true, difficultyScale: 'atcoder-kenkoooo-irt', syncSources: ['none'] },
+  { id: 'luogu', name: '洛谷', nameEn: 'Luogu', hasOfficialApi: false, homepage: 'https://www.luogu.com.cn', sync: 'cookie', hasBank: true, difficultyScale: 'luogu-2026-06', syncSources: ['none'] },
+  // 牛客自 2026-10 起是多来源：主站在线编程 + ACM 练习 + 竞赛提交（见 adapters/nowcoder.ts）
+  { id: 'nowcoder', name: '牛客', nameEn: 'Nowcoder', hasOfficialApi: false, homepage: 'https://ac.nowcoder.com', sync: 'auto', hasBank: true, difficultyScale: 'nowcoder-score', syncSources: ['practice', 'contest'] },
+  // 代码源（Hydro 系）：评测记录页需登录（会话 Cookie sid），题库公开
+  { id: 'daimayuan', name: '代码源', nameEn: 'Daimayuan', hasOfficialApi: false, homepage: 'https://bs.daimayuan.top', sync: 'cookie', hasBank: true, difficultyScale: 'hydro-1-10', syncSources: ['none'] },
+  // 力扣（leetcode.cn）：GraphQL 接口无官方公开 API；提交记录需登录 Cookie，题库匿名可访问。
+  // 仅接入了力扣中国（leetcode.cn）——国际版 leetcode.com 的 GraphQL schema 不同，未接入。
+  { id: 'leetcode', name: 'LeetCode', nameEn: 'LeetCode', hasOfficialApi: false, homepage: 'https://leetcode.cn', sync: 'cookie', hasBank: true, difficultyScale: 'leetcode-tier', syncSources: ['none'] },
+  // 计蒜客（www.jisuanke.com，原 nanti.jisuanke.com 竞赛 OJ）：无公开 API；
+  // 提交记录按「参加过的比赛」组织，需登录 Cookie 后逐赛拉取，题库非独立公开页。
+  { id: 'jisuanke', name: '计蒜客', nameEn: 'Jisuanke', hasOfficialApi: false, homepage: 'https://www.jisuanke.com', sync: 'cookie', hasBank: true, difficultyScale: 'jisuanke-level-8', syncSources: ['contest', 'practice'] },
+  // QOJ（qoj.ac，UOJ 系评测系统，Universal Cup 等 ICPC 系列赛的官方 OJ）：
+  // 无公开提交 API（/api/* 恒返回 401），提交记录只有服务端渲染的 /submissions 分页 HTML 可用；
+  // 站点前置 Cloudflare 托管挑战，因此除登录会话（2026-10 起站点名为 __Host-UOJSESSID，
+  // 旧名 UOJSESSID，发送前由 withHardenedSessionCookie 统一改名）外通常还需浏览器签发的 cf_clearance。
+  // 平台自身**没有难度字段**（difficultyScale 记 none = 同步路径不下发难度）；
+  // 库内难度由回填路径用 ICPC/CCPC 公开榜单档位推导，落库标度为 icpc-tier（见 analysis/icpcBoard.ts）
+  { id: 'qoj', name: 'QOJ', nameEn: 'QOJ', hasOfficialApi: false, homepage: 'https://qoj.ac', sync: 'cookie', hasBank: false, difficultyScale: 'none', syncSources: ['none'] },
+  // DashOJ（dashoj.com，基于 Hydro OJ 搭建）：与代码源同为 Hydro 系，但**评测记录页对游客开放**
+  //（GET /record?uidOrName={handle}&page={n} + Accept:application/json 匿名即可按用户名过滤），
+  // 故同步无需登录 Cookie（sync=auto，2026-10-22 实测确认）。题库 /p 公开、含 Hydro 1-10 难度字段，
+  // 复用 hydro-1-10 标度（与代码源同源映射表）。
+  { id: 'dashoj', name: 'DashOJ', nameEn: 'DashOJ', hasOfficialApi: false, homepage: 'https://dashoj.com', sync: 'auto', hasBank: true, difficultyScale: 'hydro-1-10', syncSources: ['none'] },
+  // PTA（拼题A / pintia.cn，浙江大学在线判题与题集平台，PAT 甲乙级、天梯赛、浙大教材题目集都在这里）：
+  // 无官方公开 API 文档，但 Web 端 API（/api/problem-sets/...）**对游客开放**：
+  //   · 公开题集清单 GET /api/problem-sets/always-available（23 套：PAT 甲/乙/顶级、天梯赛练习集、
+  //     浙大版 C 语言/数据结构、ZOJ 题库…）；题库 GET /api/problem-sets/{ps}/exam-problem-list
+  //   · 指定用户的提交 GET /api/problem-sets/{ps}/users/{userId}/submissions（匿名 200，cursor 分页）
+  // 因此同步**不强制** Cookie；但「我加入的题集」（课程作业、内部赛）只能登录后枚举，
+  // 故 sync 记为 cookie：配了 PTASession 覆盖更全，不配则只覆盖上述公开题集。
+  // 账号 handle 必须是**数字 userId**（昵称无法作为路径参数，站点直接 400）。
+  // 难度字段是 0-5 枚举（0=UNLIMITED 教师未标注，1-5=入门/简单/中等/较难/困难），
+  // 标度记 pta-level-5；但公开题集实测 1906/1906 全为 0 → 落到库里的多数仍是未知。
+  // 0/缺失一律按未知处理（不臆造），映射表只在 shared/src/difficulty.ts 一份。
+  // identify: true —— 账号名是 19 位数字 userId，站点又提供「当前登录用户」接口，
+  // 故登录后可由凭据反查账号（设置页「识别账号」、桌面壳登录后自动绑定都靠它）。
+  { id: 'pta', name: 'PTA', nameEn: 'PTA', hasOfficialApi: false, homepage: 'https://pintia.cn', sync: 'cookie', hasBank: true, difficultyScale: 'pta-level-5', syncSources: ['practice'], identify: true },
+  // VJudge（vjudge.net，转发站）：本身不提供题库与难度，提交记录按公开 status 分页拉取。
+  // 必须排在**末尾**：数组顺序就是各平台下拉/账号卡片的展示顺序，转发站不该占首项
+  //（2026-10-30 review 实测约 7 处列表首项被它顶掉）。
+  // syncSources 记 practice：该字段目前无消费者（计蒜客开关走 settings['jisuanke.practiceSync']），
+  // 这里如实描述「按提交记录拉取」，不再声称 contest（VJudge 不按比赛组织记录）。
+  { id: 'vjudge', name: 'VJudge', nameEn: 'VJudge', hasOfficialApi: false, homepage: 'https://vjudge.net', sync: 'auto', hasBank: false, difficultyScale: 'none', syncSources: ['practice'] },
+];
+
+export function platformMeta(id: PlatformId): PlatformMeta {
+  const m = PLATFORMS.find((p) => p.id === id);
+  if (!m) throw new Error(`unknown platform: ${id}`);
+  return m;
+}
+
+/**
+ * 本应用平台 → **VJudge 上的 OJ 字面量**（题单导出为 Virtual Judge Markdown 用）。
+ *
+ * 唯一真源放这里而不是各端各写一份：客户端此前用的是 `CF-` / `Luogu-` / `nowcoder-`，
+ * 而 VJudge 线上实际写的是 `CodeForces` / `洛谷` / `牛客`（大小写与中文都不同）——
+ * 导出的题单粘到 VJudge 里认不出来。服务端 adapters/vjudgeIdentity.ts 的登记表是
+ * 这条映射的镜像（那边多了一层「本应用有没有这个 OJ」的判定）。
+ *
+ * 没有登记的平台返回 null（VJudge 上不存在，导出的 Markdown 回退成普通链接）。
+ */
+export const VJUDGE_OJ_OF_PLATFORM: Partial<Record<PlatformId, string>> = {
+  codeforces: 'CodeForces',
+  atcoder: 'AtCoder',
+  luogu: '洛谷',
+  nowcoder: '牛客',
+  jisuanke: '计蒜客',
+  daimayuan: '代码源',
+  qoj: 'QOJ',
+};
+
+// ---------- 刷题记录与题目（平台适配器输出统一结构） ----------
+
+export type Verdict =
+  | 'AC'
+  | 'WA'
+  | 'TLE'
+  | 'RE'
+  | 'MLE'
+  | 'CE'
+  | 'SKIPPED';
+
+export interface NormalizedProblem {
+  platform: PlatformId;
+  /** 平台内唯一标识，如 CF 题号 1919C / AtCoder abc321_a */
+  problemKey: string;
+  title: string;
+  /** 难度：CF rating；AtCoder 映射分值；洛谷难度数值；无则省略 */
+  difficulty?: number;
+  /**
+   * 平台原生难度原文（洛谷 `4` / 计蒜客 `level6` / 力扣 `HARD` / 牛客 `1500` / kenkoooo `1545`）。
+   * 与 difficulty（CF rating）同时写入，供平台改档后按标度重算与 UI 展示。
+   */
+  nativeDifficulty?: string;
+  /** 原生难度所属标度（见 difficulty.ts 的 DifficultyScale） */
+  difficultyScale?: DifficultyScale;
+  url?: string;
+  tags: string[];
+}
+
+/** 提交语境（能区分赛场发挥与练习/补题的平台才下发，其余为 undefined） */
+export type SubmissionContext = 'contest' | 'virtual' | 'practice';
+
+export interface NormalizedSubmission {
+  problem: NormalizedProblem;
+  verdict: Verdict;
+  language?: string;
+  /** ISO8601 UTC */
+  submittedAt: string;
+  /** 平台侧提交号（去重/增量依据） */
+  externalId: string;
+  /**
+   * 提交语境：contest = 比赛进行中（含现场非正式参赛）、virtual = 虚拟赛、practice = 赛后补题/题单练习。
+   * 目前仅 Codeforces 下发（user.status.participantType）；能力值算法用其区分赛场 AC 与补题 AC。
+   */
+  context?: SubmissionContext;
+}
+
+export interface SyncResult {
+  platform: PlatformId;
+  handle: string;
+  imported: number;
+  skipped: number;
+  errors: string[];
+  /** 本次为增量同步（沿用上次同步起点 / 已知提交号提前终止）；仅 true 时出现 */
+  incremental?: boolean;
+  /**
+   * 本次因触及「单次同步上限」而提前停止（提交记录过多，分批拉取以防触发平台风控封号）。
+   * 为 true 时 last_sync_at 不会推进到「现在」（AtCoder 按已拉最新时间续拉），
+   * 且 platform_accounts.sync_truncated 置 1，下次同步自动进入补全模式继续拉取更早的历史。
+   */
+  truncated?: boolean;
+  /** 截断等情况下给用户的可读提示（前端直接展示） */
+  note?: string;
+  /**
+   * 本次截断后已注册的后台分批续拉（缺省 = 未注册：轮数上限为 0、days 窗口模式、
+   * 后台续拉自身触发，或未装配调度器）。前端同步中心据此显示「第 N/M 轮 · X 秒后继续」。
+   */
+  autoContinue?: { round: number; maxRounds: number; nextAt: string };
+}
+
+/** 同步任务历史一行（同步中心展示）。status: ok=成功 / failed=失败（含需手动导入引导）。 */
+export interface SyncRun {
+  id: number;
+  platform: PlatformId;
+  handle: string;
+  /** ISO8601 UTC */
+  startedAt: string;
+  finishedAt: string | null;
+  durationMs: number;
+  imported: number;
+  skipped: number;
+  truncated: number;
+  /** 限速等待总耗时（毫秒） */
+  waitedMs: number;
+  /** full=换账号全量 / incremental=增量 / backfill=补全 / days=仅最近 N 天 */
+  mode: 'full' | 'incremental' | 'backfill' | 'days';
+  status: 'ok' | 'failed';
+  /** auth_expired / rate_limited / schema_changed / manual_required / network / unknown */
+  errorCode: string | null;
+  errorMessage: string | null;
+  /** manual=手动 / retry=重试失败平台 / days=窗口同步 / all=一键同步 */
+  triggeredBy: string;
+  /** 按平台节奏推荐的下次同步时间（ISO8601，可为空） */
+  nextSuggestedSyncAt: string | null;
+}
+
+/**
+ * 进行中的同步（GET /api/sync/progress 的一项）。
+ *
+ * 为什么需要：单次同步现在按平台节奏限速（几十秒到几分钟），而 POST /api/sync/:platform
+ * 是一发到底的长请求，中途没有任何响应。前端据此显示「已用时 + 该站点请求数 + 最后请求距今」，
+ * 让用户看见它确实在动，不会误以为卡住而退出。
+ *
+ * 数据来源都是**真实发生的请求**（节流层计数），不是估值百分比 —— 适配器内部的页数/条数
+ * 知识不下放到前端，宁可不给百分比也不给假进度。
+ */
+export interface SyncProgressJob {
+  platform: PlatformId;
+  handle: string;
+  /** full=换账号全量 / incremental=增量 / backfill=补全 / days=仅最近 N 天 */
+  mode: SyncRun['mode'];
+  /** 仅 mode='days' 时有值：窗口天数 */
+  days?: number;
+  /** 单次同步新增上限（前端文案「最多 N 条」用） */
+  maxSubmissions?: number;
+  /** fetching=正在拉取提交 / saving=正在写入数据库 */
+  phase: 'fetching' | 'saving';
+  /** ISO8601 UTC */
+  startedAt: string;
+  /** 已进行时长（服务端算好，避免客户端时钟偏差） */
+  elapsedMs: number;
+  /**
+   * 本窗口内该站点的请求数（节流层按域名统计的增量）。
+   * 口径是「站点」而非「本次同步」：同期难度回填打同一站点也会计入——
+   * 这正是风控关心的量，且无论如何都证明请求在流动。
+   */
+  siteRequests: number;
+  /** 距最后一次真实请求的毫秒数；一个请求都还没发出时为 null（等待上游） */
+  lastRequestAgoMs: number | null;
+}
+
+/** 一键同步整批进度里已完成的一项 */
+export interface SyncProgressBatchItem {
+  platform: PlatformId;
+  status: 'ok' | 'failed';
+  imported: number;
+  /** 失败时的首条错误信息（与 sync_runs.error_message 同源） */
+  error?: string;
+}
+
+/** 一键同步（POST /api/sync/all）的整批进度：顺序执行，前端据此画出「待同步/已完成」 */
+export interface SyncProgressBatch {
+  /** 本批要同步的平台（顺序即执行顺序） */
+  platforms: PlatformId[];
+  /** 当前正在同步的平台；全部结束时为 null */
+  current: PlatformId | null;
+  completed: SyncProgressBatchItem[];
+  startedAt: string;
+  elapsedMs: number;
+  /**
+   * 整批结束时刻（ISO8601）；null = 仍在进行。
+   *
+   * 结束时**不立即从快照里消失**：否则最后一步「第 N 个平台完成」与「批次清空」发生在同一刻，
+   * 前端永远看不到「已完成 N/M」的收尾状态。服务端短期保留（约 5 分钟）后自行丢弃，
+   * 前端在收到 finishedAt 后展示一小段时间再隐藏。
+   */
+  finishedAt: string | null;
+}
+
+/** GET /api/sync/progress 响应：无同步时 jobs 为空数组、batch 为 null（前端据此自停轮询） */
+export interface SyncProgressSnapshot {
+  jobs: SyncProgressJob[];
+  batch: SyncProgressBatch | null;
+}
+
+/** 平台同步健康状态（按最近一次同步推导，供同步中心徽章展示） */
+export type PlatformSyncStatus =
+  | 'healthy'
+  | 'degraded'
+  | 'auth_expired'
+  | 'rate_limited'
+  | 'schema_changed'
+  | 'manual_required'
+  | 'invalid_account'
+  | 'never';
+
+/** 手动导入单行输入（JSON 表单或 CSV 解析后）。 */
+export interface ManualSubmissionRow {
+  /** 平台内题目标识，如 P1001 / abc321_a（必填） */
+  problemKey: string;
+  title?: string;
+  verdict?: string;
+  difficulty?: number;
+  /** 多个标签用 '|' 或数组 */
+  tags?: string[] | string;
+  url?: string;
+  /** ISO8601，缺省为导入时刻 */
+  submittedAt?: string;
+  language?: string;
+  externalId?: string;
+}
+
+/** 手动导入 CSV 表头（不含 platform，平台由请求 body 指定）。 */
+export const MANUAL_CSV_HEADER = [
+  'problemKey',
+  'title',
+  'verdict',
+  'difficulty',
+  'tags',
+  'url',
+  'submittedAt',
+  'language',
+  'externalId',
+] as const;
+
+// ---------- 弱项画像（分析引擎输出，跨端契约） ----------
+
+/** 去重题目的掌握证据；有效题量会按卡点和最近一次复习结果折算。 */
+export interface PracticeEvidence {
+  sampleSize: number;
+  solved: number;
+  creditedSolved: number;
+  assistedSolved: number;
+  fragileSolved: number;
+  stuckProblems: number;
+  /** 全部去重样本中因卡点/失手缺失的证据比例，百分数；可包括未 AC 题。 */
+  supportGap: number;
+}
+
+export interface WeaknessItem {
+  tag: string;
+  attempts: number;
+  ac: number;
+  /**
+   * 百分数（14.3 表示 14.3%），与后端 `analysis/stats.rate()` 同量纲。
+   * **不是** 0–1 比例：消费方请用 `client/src/ui.ts` 的 `pct()` 格式化，
+   * 不要再乘 100（历史缺陷：设置页双口径对比弹窗乘了第二次，显示成 1430%）。
+   */
+  acRate: number;
+  /** 同上：百分数（45.6 表示 45.6%） */
+  avgAcRate: number;
+  /** avg - self，正值表示弱于总体平均；单位为**百分点**（31.3 = 高 31.3 个百分点） */
+  gap: number;
+  /**
+   * 排序得分 = evidenceGap × 概念信息量权重（缺省回退 gap）。
+   * 低信息量的膨胀标签（如低难度题的「数学」覆盖 24.8%）被降权后排到后面；
+   * gap 本身保持不变，仍是原始可观测的 AC 率差值。
+   */
+  rank: number;
+  solved: number;
+  evidence?: PracticeEvidence;
+  /** 原始 gap 加上依赖帮助/复习失手导致的证据缺口；原始 AC 率与 gap 不变。 */
+  evidenceGap?: number;
+}
+
+export interface DifficultyWeakness {
+  bucket: string;
+  attempts: number;
+  ac: number;
+  /** 百分数（14.3 = 14.3%），非 0–1 比例 */
+  acRate: number;
+  /** 百分点差值（31.3 = 高 31.3 个百分点） */
+  gap: number;
+}
+
+export interface WeaknessProfile {
+  items: WeaknessItem[];
+  byDifficulty: DifficultyWeakness[];
+  generatedAt: string;
+}
+
+
+// ---------- 复习库（间隔复习，借鉴 cf-compass） ----------
+
+export type ReviewFeedback = 'hard' | 'ok' | 'easy';
+
+export interface ReviewPlanTask {
+  id: number;
+  title: string;
+  planTitle: string;
+}
+
+export interface ReviewFeedbackResult {
+  stage: number;
+  nextDueOn: string;
+  eventId: number;
+  planTasks: ReviewPlanTask[];
+}
+
+/** 一次复习的历史快照，间隔与系数均为当时实际生效值。 */
+export interface ReviewHistoryEvent {
+  id: number;
+  platform: PlatformId;
+  problemKey: string;
+  reviewedAt: string;
+  feedback: ReviewFeedback;
+  stageBefore: number;
+  stageAfter: number;
+  dueOn: string;
+  intervalDays: number;
+  factor: number;
+}
+
+export interface ReviewHistory {
+  /** 当前用户的原题及镜像记录合并统计 */
+  total: number;
+  lapseCount: number;
+  page: number;
+  pageSize: number;
+  items: ReviewHistoryEvent[];
+}
+
+/** 复习队列条目（服务端联表 problems 输出） */
+export interface ReviewItem {
+  id: number;
+  platform: PlatformId;
+  problemKey: string;
+  title: string;
+  difficulty: number | null;
+  url: string | null;
+  tags: string[];
+  /** 间隔阶梯档位（0 起步） */
+  stage: number;
+  /** 当前档位对应的间隔天数（基线；实际排期还乘了留存系数） */
+  intervalDays: number;
+  /** 该条目累计复习次数 / 其中判为「困难（失手）」的次数（来自 review_events） */
+  reviewCount: number;
+  lapseCount: number;
+  note: string | null;
+  /** 下次到期日 YYYY-MM-DD */
+  nextDueOn: string;
+  lastReviewedAt: string | null;
+  addedAt: string;
+}
+
+/**
+ * 月历角标用的一天复习量。
+ * overdue 只挂在「今天」那一格：逾期项原本该在更早的日子做，把它们摊回各自的历史日期
+ * 会让过去的格子凭空多出任务（那天用户确实没这些题），而它们现在的实际归属就是今天。
+ */
+export interface ReviewCalendarDay {
+  /** YYYY-MM-DD */
+  date: string;
+  /** 该日到期数（不含逾期） */
+  due: number;
+  /** 逾期未做的数量（仅今天那一格非 0） */
+  overdue: number;
+}
+
+// ---------- 今日训练（三档题单，借鉴 cf-compass） ----------
+
+export type TodayBandKey = 'consolidation' | 'core' | 'challenge';
+
+/** 三档题单中的候选题 */
+export interface TodayProblem {
+  id: number;
+  platform: PlatformId;
+  problemKey: string;
+  title: string;
+  difficulty: number | null;
+  url: string | null;
+  tags: string[];
+  /** 命中的弱项标签（推荐理由） */
+  weakTags: string[];
+  /** 已在复习队列时为复习条目 id（用于移出），否则 null */
+  reviewItemId: number | null;
+}
+
+export interface TodayBand {
+  key: TodayBandKey;
+  label: string;
+  description: string;
+  /** 本档难度区间 [min, max]（闭区间，null 表示不限） */
+  range: [number | null, number | null];
+  problems: TodayProblem[];
+  /** 该难度段的候选题总数（选题前，用于空态提示） */
+  pool: number;
+  /** 候选题不足时放宽了哪条去重规则（冷却窗口/复习排除）；null 表示按标准规则出题 */
+  relaxed: string | null;
+}
+
+/** 能力值构成明细（透出给 UI / AI，便于理解计算值从哪来） */
+export interface AbilityLevelDetail {
+  /** 难度基数：窗口内解题证据的加权中位数（含离群折扣）；无任何带难度 AC 时为 null */
+  base: number | null;
+  /** 通过率校准修正（同段难度 AC 率推导，±150 封顶） */
+  performanceAdj: number;
+  /** 解题证据口径下的目标值（base + performanceAdj，未混入 rating）；无 rating 证据时与 target 相同 */
+  solveTarget: number;
+  /** rating 锚点：各平台近期 rated 场次各自算时效加权均值、换算到 CF 标尺后**取最高**（含保守折扣）；无合格锚点为 null */
+  ratingAnchor: number | null;
+  /** 胜出锚点来自哪个平台（如「Codeforces」「AtCoder」「牛客」） */
+  ratingAnchorPlatform: string | null;
+  /** 胜出平台的原分（换算前）；与 ratingAnchor 不同即说明这一项是换算来的 */
+  ratingAnchorRaw: number | null;
+  /** 胜出平台的 rated 场次数 */
+  ratingSamples: number;
+  /** 锚点在目标值中的混合权重（0–0.45，随有效场数上升；0 = rating 不参与计算） */
+  ratingWeight: number;
+  /** 未胜出平台按近期分差给出的方向性修正（绝对分不进模型的部分只走这里，±80 内） */
+  ratingTrendAdj: number;
+  /** 最终目标值：解题估算与 rating 锚点按权重混合，再叠分差趋势（未做平滑） */
+  target: number;
+  /** 自上次校准以来的新证据数（练习提交 + 新同步的带 rating 参赛场次；0 = 能力值保持不动） */
+  newEvidence: number;
+  /** 窗口内参与估算的解题证据条数 */
+  samples: number;
+}
+
+export interface TodayPlanTask {
+  id: number;
+  task_date: string;
+  title: string;
+  kind: 'practice' | 'review' | 'topic' | 'contest';
+  url: string | null;
+  note: string | null;
+  platform: PlatformId | null;
+  problem_key: string | null;
+  problem_title: string | null;
+  problem_url: string | null;
+  checked: number | null;
+  plan_id: number;
+  plan_title: string;
+  solvedToday: boolean;
+}
+
+export interface TodayPlan {
+  date: string;
+  /**
+   * 估算能力值（加权解题证据模型：难度加权中位数 × 独立完成度降权 × 通过率校准，
+   * 再与赛事中心的 CF rating 锚点按置信权重混合、按 AtCoder/牛客 近期分差微调，
+   * 最后做有状态的缓慢校准；千人千面的三档分档基准）
+   */
+  level: number;
+  /** 能力值构成明细（缺失时 UI 不展示构成） */
+  levelDetail?: AbilityLevelDetail;
+  /** 标准冷却窗口：近 N 天推荐过的题不再出现 */
+  cooldownDays: number;
+  bands: TodayBand[];
+  /** 到期复习数（来自复习库；等于 dueReviewItems.length，保留计数字段供挂件等只读消费方使用） */
+  dueReviews: number;
+  /**
+   * 今天及以前到期的复习条目（含逾期），按到期日升序。
+   * 三档题单刻意排除复习队列中的题（见 today/select.ts 的 SUPPRESSION_TIERS），
+   * 只给一个计数会让用户看到「有 N 道题该复习」却不知道是哪几道——
+   * 这里把条目本身带出来，界面可直接给反馈推进排期。
+   */
+  dueReviewItems: ReviewItem[];
+  /** 今日计划任务完成度（无计划时为 null） */
+  planProgress: { total: number; checked: number } | null;
+  /** 当天所有计划的任务，保留计划归属及当日 AC 证据。 */
+  planTasks: TodayPlanTask[];
+}
+
+// ---------- 赛事中心（多 OJ 公开赛事列表） ----------
+
+export interface ContestInfo {
+  /** 平台内唯一 ID：cf-2259 / at-abc380 / lg-353129 */
+  id: string;
+  platform: PlatformId;
+  name: string;
+  /** 展示用分类：Div. 2 / ABC / AGC / 月赛 / 重现赛 … */
+  category: string;
+  /** ISO8601 开始时间（null = 时间待定，不参与日程） */
+  startTimeIso: string | null;
+  /** 时长（分钟） */
+  durationMinutes: number;
+  phase: string;
+  url: string;
+}
+
+// ---------- 赛后复盘（从提交记录推导「参加过的比赛」） ----------
+
+/**
+ * 一场从用户提交记录推导出的比赛。数据库没有比赛实体，比赛归属由
+ * problemKey / url 的结构（或与赛事日历的时间窗匹配）反解而来，
+ * evidence 说明该场是凭哪种信号判定为「参加过」。
+ */
+export interface ParticipatedContest {
+  /** 复盘关联键：`{platform}:{contestId}`（洛谷无比赛号时为日历场次 id） */
+  key: string;
+  platform: PlatformId;
+  /** 平台内比赛标识（CF: 1877 / AtCoder: abc380 / 计蒜客·QOJ: 数字 id）；洛谷为比赛 id */
+  contestId: string;
+  /**
+   * 同一平台多账号时该场涉及的所有账号（提交归属 ∪ 平台参赛记录）。
+   * 只在 2 个及以上账号时给出：单账号用户不需要这层噪声。
+   * source 里的成绩来自其中之一（本地该场提交最多的账号），界面要标明不是单人成绩。
+   */
+  accounts?: string[];
+  /** 赛名（与赛事日历匹配；匹配不到为 null，展示端回退「平台名 · contestId」） */
+  name: string | null;
+  url: string;
+  /** 官方开始时间（日历匹配到时），否则用首条提交时间近似 */
+  startTimeIso: string | null;
+  /** 官方结束时间（日历匹配到时），否则用末条提交时间近似 */
+  endTimeIso: string | null;
+  /** 缺少完整官方赛程，展示时间包含提交活动近似，不能作为赛时归因依据。 */
+  timeIsApproximate?: boolean;
+  submissionCount: number;
+  problemCount: number;
+  /** 官方题单或平台元数据给出的全场题数；null = 未获取，独立于账号成绩。 */
+  totalProblemCount?: number | null;
+  /**
+   * 无权威题数来源（官方题单/平台元数据都没有，如 CF gym 场次：problemset 全集
+   * 不含 gym、standings 匿名 401）时，problemCount 只是本地已提交题数的下界，
+   * 展示时不能当「全场共 N 题」——必须标注至少/已提交口径。
+   */
+  problemCountIsLowerBound?: boolean;
+  /** 当前 AC 的题数（含赛后补题；与赛时口径 inContestAcProblemCount 配对看补题进度） */
+  acProblemCount: number;
+  /** 缺少平台赛时已 AC 题目的逐条身份，当前 AC 只保证至少这么多，不能精确计算剩余补题数。 */
+  acCountIsLowerBound?: boolean;
+  /**
+   * 赛时（比赛时间窗内）AC 的题数；null = 无法与补题划分（无平台赛时成绩、
+   * 无 CF context、无官方起止时间）。与当前 AC 配对展示：赛中 < 当前 = 还有题没补完。
+   */
+  inContestAcProblemCount: number | null;
+  /** 本场最后一次提交时间（列表按它倒序 = 最近复盘优先）；无提交时用官方结束时间 */
+  lastSubmittedAt: string;
+  /** 参赛判定依据：contest（现场）/ virtual / gym / key-pattern（计蒜客参赛同步题键）/ calendar-window / heuristic / joined-list（平台参赛记录）；QOJ 题键本身不证明参赛 */
+  evidence: string;
+  /** 平台参赛记录携带的成绩（user.rating / AtCoder history / 牛客参赛历史等来源；本地推导为 null） */
+  source: {
+    /** 排名、Rating 与赛时 AC 的所属账号；当前 AC 则按 accounts 合并去重。 */
+    account?: string;
+    rank: number | null;
+    rating: number | null;
+    ratingChange: number | null;
+    problemCount: number | null;
+    acceptedCount: number | null;
+  } | null;
+  /** Rated classification from the platform's explicit rating-change record; absent before contest analysis loads. */
+  ratingStatus?: ContestRatingStatus;
+}
+
+/** Contest-level rating status. Missing source data must remain pending. */
+export type ContestRatingStatus = 'rated' | 'unrated' | 'pending';
+
+export interface ContestAnalysisProblem {
+  contestKey: string;
+  platform: PlatformId;
+  problemKey: string;
+  title: string;
+  url: string | null;
+  attemptCount: number;
+  postContestAttemptCount: number;
+  contestAccepted: boolean;
+  postContestAccepted: boolean;
+  tags: string[];
+}
+
+export interface ContestAnalysisContest {
+  contest: ParticipatedContest;
+  ratingStatus: ContestRatingStatus;
+  problems: ContestAnalysisProblem[];
+  untaggedStuckCount: number;
+  /**
+   * 题目集（全场题单）是否已知。false = problems 只含用户自己提交过的题，
+   * problems.length 不能当全场题数展示（CF gym 场次题单不可得的降级口径）。
+   */
+  problemSetKnown: boolean;
+}
+
+export interface ContestAnalysisResponse {
+  contests: ContestAnalysisContest[];
+  /** 该用户全部历史赛时标签（去重，按使用次数降序）——前端选择框的候选来源之一 */
+  usedTags?: string[];
+}
+
+// ---------- 知识点掌握度地图（刷题数据 × 模板课程联动） ----------
+
+/**
+ * 标签 → 规范名的同义词体系（含可选的 taxonomy code 锚定）。
+ *
+ * 实现已移至 `./tags.ts`：把「平台英文标签 / 课程中文 tag / 常见别名」组织为同义词组，
+ * 带 code 的组名严格等于 taxonomy 的 name，从结构上消除「归并目标名不存在」导致的
+ * 同一知识点分裂（历史缺陷：'binary search' → 「二分」，而体系里叫「二分查找」）。
+ * 此处仅做 re-export，保持既有 import 路径（'.../shared/src/index.ts'）不变。
+ */
+export {
+  TAG_SYNONYM_GROUPS,
+  TAG_ALIAS_TO_CANONICAL,
+  canonicalTag,
+  expandTag,
+  codeOfTag,
+  codeOfCanonicalName,
+  coarseCategoryNames,
+  type TagSynonymGroup,
+} from './tags.ts';
+
+// ---------- 外部学习资源（cp-algorithms 延伸阅读，见 readingRefs.ts 头注） ----------
+
+export {
+  CP_ALGORITHMS,
+  READING_REFS,
+  readingRefsOf,
+  readingRefCount,
+  buildArticleAskText,
+  type ReadingSite,
+  type ReadingArticle,
+  type ReadingRefMap,
+} from './readingRefs.ts';
+
+export {
+  TEMPLATE_TIER_LABELS,
+  TEMPLATE_TIER_OPTIONS,
+  templateTierLabel,
+  templateTierBadge,
+  type TemplateTier,
+} from './templateTiers.ts';
+
+// ---------- 平台凭据表单字段（client 渲染 + server 单字段合并校验的共享真相） ----------
+
+export {
+  COOKIE_FIELDS,
+  CREDENTIAL_UA_FIELDS,
+  HARDENED_SESSION_COOKIES,
+  cookieFieldsOf,
+  cookieOnlyFieldsOf,
+  cookieFieldValue,
+  buildCookieItem,
+  mergeCookieFields,
+  splitCookieFields,
+  withHardenedSessionCookie,
+  cleanUserAgent,
+  type CookieFieldDef,
+} from './credentials.ts';
+
+// ---------- 标签净化：过滤非算法能力维度的噪声标签 ----------
+
+/** CF 特殊题型标记（*special / *2200 等，非算法维度） */
+const CF_NOISE_PREFIX = '*';
+
+/**
+ * 赛事/来源/机构类关键词（洛谷 tag 字典"来源"分区 + 各地区赛事）。
+ * 子串匹配，只收无碰撞风险的词；两字母缩写（WF）与易撞英文词根的缩写分别走
+ * CONTEST_SOURCE_EXACT_TAGS 整词匹配、带全角括号的「XX（国家）」写法。
+ * 以真实库存活 tag 全集校准（2026-09-30 快照：dev 库 ∪ 内置题库共 631 个存活 tag）。
+ * 上一轮校准（2026-08 洛谷 117 tag）后题库扩充，梦熊比赛 / Google 系 / 国际 OI 缩写成批漏网，
+ * 其中「梦熊比赛」以 unmapped tag 身份冲进弱项 top（2026-09 用户反馈）。
+ */
+const CONTEST_SOURCE_KEYWORDS = [
+  '蓝桥杯', 'NOIP', 'NOI', '省选', '省赛', '联赛', '洛谷', 'Codeforces', 'AtCoder',
+  'ABC', 'ARC', 'AGC', '牛客', 'GESP', 'USACO', 'IOI', 'ICPC', 'COCI', 'POI',
+  'NERC', 'CERC', 'eJOI', 'Code+', '夏令营', '导刊', '青少年', '信息与未来',
+  // 洛谷"来源"分区：梦熊/校园/机构赛事（「杯」为杯赛族兜底，算法词汇中无含「杯」的标签）
+  '梦熊', 'Google', 'Kick Start', 'Code Jam', 'Olympiad', '杯',
+  '校赛', '省赛', '邀请赛', '月赛', '入门赛', '集训队', '活动',
+  'CSP-J', 'CSP-S', 'CCPC', 'THUPC', 'THUSC', 'THUWC', 'EC Final', 'CSPro',
+  'NWRRC', 'SEERC', 'SWERC', 'NAC', 'AGM', 'CCC',
+  // 国际 OI 家族：JOI（日本）/ ROI（俄罗斯）/ BalticOI（波罗的海）等
+  'JOI', 'KOI', 'UOI', 'ROI', 'BalticOI', 'NordicOI', 'MCC', 'KTSC',
+  'OI（', 'OI(', 'PA（', 'PO（', 'CCO（',
+];
+
+/** 整词匹配的赛事缩写：子串匹配会误伤（如 WF），只认完整标签 */
+const CONTEST_SOURCE_EXACT_TAGS = new Set(['WF']);
+
+/** 省份/地区/承办城市名（洛谷 tag 字典中的地区分区 + 赛事承办地） */
+const REGION_TAGS = new Set([
+  '北京', '天津', '安徽', '江苏', '湖南', '福建', '浙江', '上海', '广东',
+  '四川', '重庆', '河北', '河南', '山东', '陕西', '湖北',
+  // 2026-09 校准补齐的省级行政区
+  '山西', '辽宁', '吉林', '黑龙江', '江西', '广西', '海南', '贵州',
+  '云南', '甘肃', '青海', '宁夏', '新疆', '西藏', '内蒙古', '台湾', '香港', '澳门',
+  // 常见承办城市（含海外：横浜=JAG、首尔=KOI 承办地）
+  '南京', '西安', '成都', '哈尔滨', '济南', '昆明', '青岛', '杭州', '横浜', '首尔',
+]);
+
+/** 其他明确非算法能力维度的标签（题型事务/评分方式/教学分类） */
+const MISC_NOISE_TAGS = new Set([
+  'O2优化', 'Special Judge', 'SPJ', '提交答案', '提答', '模板题', '入门',
+  // 洛谷/牛客入门练习场的进度分类（「通关/语言」栏目），非算法能力维度
+  '过关题目', '语言题',
+]);
+
+/** 纯年份（如 1998 / 2026）：题目来源年份 */
+function isYearTag(tag: string): boolean {
+  return /^(19|20)\d{2}$/.test(tag);
+}
+
+/** 含赛事/来源关键词的标签（如「蓝桥杯省赛」「NOIP 普及组」「各省省选」） */
+function isContestSourceTag(tag: string): boolean {
+  return CONTEST_SOURCE_KEYWORDS.some((k) => tag.includes(k));
+}
+
+/** 判断单个标签是否为噪声（非算法能力维度） */
+export function isNoiseTag(tag: string): boolean {
+  const t = tag.trim();
+  if (t === '') return true;
+  if (t.startsWith(CF_NOISE_PREFIX)) return true;
+  if (isYearTag(t)) return true;
+  if (isContestSourceTag(t)) return true;
+  if (CONTEST_SOURCE_EXACT_TAGS.has(t)) return true;
+  if (REGION_TAGS.has(t)) return true;
+  if (MISC_NOISE_TAGS.has(t)) return true;
+  return false;
+}
+
+/** 过滤标签数组，仅保留算法能力维度标签 */
+export function filterNoiseTags(tags: string[]): string[] {
+  return tags.filter((t) => !isNoiseTag(t));
+}
+
+/** 掌握度档位：0 未开始 / 1 接触 / 2 入门 / 3 掌握 / 4 熟练 */
+export type MasteryLevel = 0 | 1 | 2 | 3 | 4;
+
+export const MASTERY_LEVEL_LABELS: Record<MasteryLevel, string> = {
+  0: '未开始',
+  1: '接触',
+  2: '入门',
+  3: '掌握',
+  4: '熟练',
+};
+
+export interface MasteryTemplateLink {
+  id: string;
+  name: string;
+  categoryKey: string;
+  categoryName: string;
+  status: 'todo' | 'learning' | 'mastered';
+}
+
+export interface MasteryPoint {
+  tag: string;
+  /** 知识点 code（taxonomy 口径的点才有；tag 口径回退点无此字段） */
+  code?: string;
+  solved: number;
+  attempts: number;
+  acRate: number;
+  /** 全部提交的总体 AC 率（弱项 gap 基准，与弱项画像一致） */
+  avgAcRate: number;
+  /** avgAcRate - acRate，正值表示弱于自身平均 */
+  gap: number;
+  level: MasteryLevel;
+  /** 近 8 周通过题数（近期活跃度） */
+  recentSolved: number;
+  templates: MasteryTemplateLink[];
+  evidence?: PracticeEvidence;
+  evidenceGap?: number;
+}
+
+export interface MasteryReport {
+  generatedAt: string;
+  points: MasteryPoint[];
+}
+
+// ---------- 自建知识点管线（taxonomy + L1 规则 / L2 AI / L3 人工） ----------
+
+/**
+ * 标注来源：tag=题源标签映射（含粗粒度）/ rule=L1 标题规则 /
+ * ai=L2 批量模型分类 / manual=L3 人工校正（永不被重跑覆盖）。
+ * 同 code 冲突时的优先级：manual > ai > rule > tag（tag 层只补空缺，见 tagAnnotate.ts）。
+ */
+export type KnowledgeSource = 'tag' | 'rule' | 'ai' | 'manual';
+
+/** 单题单个知识点的标注条目（problem_keypoints 行 / JSONL 内嵌结构） */
+export interface KnowledgePointEntry {
+  /** taxonomy code，如 basic.binary-search（稳定不可改） */
+  code: string;
+  /** 展示名（自 taxonomy 反规范化，启动重载时刷新） */
+  name: string;
+  confidence: number;
+  source: KnowledgeSource;
+  /** 溯源：rule#rNNN / ai:model名 / manual */
+  method: string;
+}
+
+/** JSONL 落盘格式：每行一题，源真相（可审计、可重建 SQLite 索引） */
+export interface KnowledgeAnnotation {
+  platform: PlatformId;
+  problemKey: string;
+  knowledgePoints: Array<Omit<KnowledgePointEntry, 'name'>>;
+  taxonomyVersion: number;
+  pipelineVersion: number;
+  /** ISO8601 UTC */
+  annotatedAt: string;
+}
+
+/** 覆盖率报告（GET /api/knowledge/coverage） */
+export interface KnowledgeCoverage {
+  total: number;
+  /** 有 ≥1 个达到统计阈值标注的题数 */
+  annotated: number;
+  /** 覆盖率百分数（0-100，保留 1 位小数；6.5 即 6.5%） */
+  coverage: number;
+  /** 有标注但全部低于统计阈值的题数 */
+  lowConfidenceOnly: number;
+  /** 各来源覆盖题数；AI 已退出清洗模块，ai 恒为 0 */
+  bySource: Record<KnowledgeSource, number>;
+  /** 未标注题数（统计端回退净化 tag，计入「未覆盖」桶） */
+  uncovered: number;
+  taxonomyVersion: number;
+  /** 生效管线版本（= 代码版本 × 1000 + rules.json 版本，规则表改动即自动变化） */
+  pipelineVersion: number;
+  /** rules.json 版本 */
+  rulesVersion: number;
+  /** 统计端生效的置信度阈值（设置页可调，默认 0.6） */
+  threshold: number;
+}
+
+/** 双口径对比单项（GET /api/knowledge/compare）：tag 口径 vs 知识点口径弱项 top */
+export interface KnowledgeCompareReport {
+  generatedAt: string;
+  threshold: number;
+  tagCaliber: WeaknessItem[];
+  knowledgeCaliber: WeaknessItem[];
+  /** 知识点口径中因无标注回退 tag 的「未覆盖」桶统计（null = 全部有标注）；acRate 为百分数（43.3 = 43.3%） */
+  uncovered: { attempts: number; ac: number; acRate: number } | null;
+}
+
+// ---------- 赛前提醒 ----------
+
+export interface ContestReminderConfig {
+  enabled: boolean;
+  /** 开赛前多少分钟提醒（5-120） */
+  minutesBefore: number;
+}
+
+// ---------- AI 模型提供商（多提供商配置，见 aiProviders.ts 头注） ----------
+
+export {
+  AI_PROVIDER_PRESETS,
+  AI_PROVIDER_CUSTOM_PRESET,
+  AI_PROVIDERS_MAX,
+  AI_PROVIDER_MODELS_MAX,
+  guessModelCaps,
+  capsFromModelNameHint,
+  MODEL_CAPS_AS_OF,
+  type AiProviderConfig,
+  type AiProviderView,
+  type AiProviderPreset,
+  type AiProviderModelEntry,
+  type ModelCaps,
+} from './aiProviders.ts';
+
+// ---------- 联网搜索引擎注册表（多渠道 fallback，见 searchEngines.ts 头注） ----------
+
+export {
+  SEARCH_ENGINE_IDS,
+  SEARCH_ENGINES,
+  searchEngineMeta,
+  isSearchEngineId,
+  normalizeEngineKeys,
+  parseSearchProvidersConfig,
+  type SearchEngineId,
+  type SearchEngineMeta,
+  type SearchEngineChannelView,
+  type SearchProvidersConfig,
+} from './searchEngines.ts';
+
+// ---------- 平台难度 → CF rating 统一标尺（唯一真源） ----------
+
+export {
+  CF_RATING_MIN,
+  CF_RATING_MAX,
+  LUOGU_LEVEL_NAMES,
+  LUOGU_LEVEL_TO_RATING,
+  JISUANKE_LEVEL_NAMES,
+  JISUANKE_LEVEL_TO_RATING,
+  ATCODER_ANCHORS,
+  LEETCODE_TIER_TO_RATING,
+  HYDRO_LEVEL_TO_RATING,
+  atcoderThetaToRating,
+  nowcoderScoreToRating,
+  parseNativeDifficulty,
+  toCfRating,
+  nativeDifficultyLabel,
+  difficultyFields,
+  cfRatingTitle,
+  type DifficultyScale,
+  type DifficultyParse,
+} from './difficulty.ts';
+/** 在 AI 辅导上下文中追加，不作为聊天消息展示。 */
+export interface AiCustomPrompt {
+  title: string;
+  content: string;
+}
+

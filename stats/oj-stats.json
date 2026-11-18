@@ -1191,7 +1191,7 @@
       "pending": false,
       "page": 1,
       "cursor": "2026-11-17T14:58:05.000Z",
-      "lastSuccessAt": "2026-11-18T08:21:57.560Z",
+      "lastSuccessAt": "2026-11-18T08:31:07.270Z",
       "status": "ok",
       "notes": []
     },
@@ -1785,7 +1785,7 @@
       "pending": false,
       "page": 1,
       "cursor": "2026-11-11T05:55:13.000Z",
-      "lastSuccessAt": "2026-11-18T08:21:57.560Z",
+      "lastSuccessAt": "2026-11-18T08:31:07.270Z",
       "status": "ok",
       "notes": []
     },
@@ -3747,7 +3747,7 @@
       "pending": false,
       "page": 1,
       "cursor": "2026-10-21T01:50:08.000Z",
-      "lastSuccessAt": "2026-11-18T08:21:57.560Z",
+      "lastSuccessAt": "2026-11-18T08:31:07.270Z",
       "status": "ok",
       "notes": []
     },
@@ -3763,7 +3763,7 @@
       "notes": [],
       "snapshotCount": 258,
       "countSource": "luogu-profile",
-      "error": "洛谷 API HTTP 403（Cookie 可能已过期或触发风控）"
+      "error": "洛谷 API HTTP 403（Cookie 可能已过期或触发风控）；公开主页也未成功：洛谷公开主页暂不可用（www.luogu.com.cn: HTTP 403；www.luogu.com: HTTP 403）"
     }
   }
 }

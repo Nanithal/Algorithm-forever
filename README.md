@@ -9,12 +9,12 @@
 <!-- OJ-STATS:START -->
 | 平台 | 账号 | 已通过题数 | 同步状态 | 最近成功同步（北京时间） |
 | :-- | :-- | --: | :-- | :-- |
-| Codeforces | [yuxoxo](https://codeforces.com/profile/yuxoxo) | 69 | 已同步 | 2026-11-18 16:31 |
-| 牛客 | [931614431](https://ac.nowcoder.com/acm/contest/profile/931614431) | 135 | 已同步 | 2026-11-18 16:31 |
-| 洛谷 | [2056356](https://www.luogu.com.cn/user/2056356) | 258 | 更新失败，保留缓存：洛谷 API HTTP 403（Cookie 可能已过期或触发风控）；公开主页也未成功：洛谷公开主页暂不可用（www.luogu.com.cn: HTTP 403；www.luogu.com: HTTP 403） | 2026-11-18 12:06 |
-| AtCoder | [Xuyo](https://atcoder.jp/users/Xuyo) | 38 | 已同步 | 2026-11-18 16:31 |
+| Codeforces | [yuxoxo](https://codeforces.com/profile/yuxoxo) | 69 | 已同步 | 2026-11-18 16:35 |
+| 牛客 | [931614431](https://ac.nowcoder.com/acm/contest/profile/931614431) | 135 | 已同步 | 2026-11-18 16:35 |
+| 洛谷 | [2056356](https://www.luogu.com.cn/user/2056356) | 258 | 已同步 | 2026-11-18 16:35 |
+| AtCoder | [Xuyo](https://atcoder.jp/users/Xuyo) | 38 | 已同步 | 2026-11-18 16:35 |
 
-已获取合计：**≥ 500**。同一平台按题目去重，跨平台分别计数。
+已获取合计：**500**。同一平台按题目去重，跨平台分别计数。
 
 数据由 [icpc-workbench](https://github.com/ZF3373/icpc-workbench) 平台适配器获取；AtCoder 使用社区镜像，可能有收录延迟。
 “≥”表示历史记录尚未拉完、来源受限或部分平台未取得数据；失败时显示上次成功缓存。

@@ -59,6 +59,58 @@ test('Luogu profile count validates account identity and field type', async () =
   await assert.rejects(fetchLuoguProfileCount(fake({ uid: 2056356, passedProblemCount: '258' }), '2056356'));
 });
 
+test('Luogu falls back to the official international public profile after a 403', async () => {
+  const requests = [];
+  const sources = [];
+  const actual = async (url, init) => {
+    requests.push({ url, headers: init.headers });
+    if (new URL(url).hostname === 'www.luogu.com.cn') return new Response('Forbidden', { status: 403 });
+    return response({ data: { user: { uid: 2056356, passedProblemCount: 258 } } });
+  };
+  const count = await fetchLuoguProfileCount(actual, '2056356', { onSource: source => sources.push(source) });
+  assert.equal(count, 258);
+  assert.equal(requests.length, 2);
+  assert.deepEqual(sources, ['https://www.luogu.com']);
+  assert.equal(requests[1].headers.Referer, 'https://www.luogu.com/');
+  assert(requests.every(request => !String(request.headers.Cookie).includes('__client_id')));
+});
+
+test('Luogu can use public totals when the authenticated submission endpoint is blocked', async () => {
+  const conf = config({ codeforces: '', luogu: '2056356' });
+  const state = await syncStats(conf, empty(), { luogu: {
+    fetchUserSubmissions: async () => { throw new Error('HTTP 403'); },
+    fetchProfileCount: async () => 258,
+  } }, { env: { LUOGU_COOKIE: '_uid=2056356; __client_id=test' }, now: NOW });
+  assert.equal(state.platforms.luogu.status, 'ok');
+  assert.equal(state.platforms.luogu.countSource, 'luogu-profile');
+  assert.equal(solvedCount(state.platforms.luogu), 258);
+  assert.equal(state.platforms.luogu.lastSuccessAt, NOW);
+});
+
+test('Luogu preserves an old snapshot when both authenticated and public access fail', async () => {
+  const conf = config({ codeforces: '', luogu: '2056356' });
+  const previous = await syncStats(conf, empty(), { luogu: { fetchProfileCount: async () => 258 } }, { env: {}, now: NOW });
+  const state = await syncStats(conf, previous, { luogu: {
+    fetchUserSubmissions: async () => { throw new Error('HTTP 403'); },
+    fetchProfileCount: async () => { throw new Error('public HTTP 403'); },
+  } }, { env: { LUOGU_COOKIE: '_uid=2056356; __client_id=test' }, now: '2026-11-19T02:00:00.000Z' });
+  assert.equal(solvedCount(state.platforms.luogu), 258);
+  assert.equal(state.platforms.luogu.status, 'error');
+  assert.equal(state.platforms.luogu.lastSuccessAt, NOW);
+  assert.match(state.platforms.luogu.error, /公开主页也未成功/);
+});
+
+test('a successful authenticated Luogu sync does not request fallback profiles', async () => {
+  const conf = config({ codeforces: '', luogu: '2056356' });
+  const state = await syncStats(conf, empty(), { luogu: {
+    fetchUserSubmissions: async () => [row('1', 'P1001', 'AC', 'luogu')],
+    fetchProfileCount: async () => { throw new Error('unexpected fallback'); },
+  } }, { env: { LUOGU_COOKIE: '_uid=2056356; __client_id=test' }, now: NOW });
+  assert.equal(state.platforms.luogu.status, 'ok');
+  assert.equal(solvedCount(state.platforms.luogu), 1);
+  assert.equal(state.platforms.luogu.snapshotCount, undefined);
+});
+
 test('an account change never displays the previous account count', async () => {
   const previous = await syncStats(config(), empty(), { codeforces: adapter(async () => [row('1', '100A')]) }, { now: NOW });
   const conf = config({ codeforces: 'different' });

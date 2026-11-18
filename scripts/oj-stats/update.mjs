@@ -98,24 +98,41 @@ export function createAdapters() {
   return {
     codeforces: createCodeforcesAdapter(http),
     nowcoder: createNowcoderAdapter(http),
-    luogu: Object.assign(createLuoguAdapter(http), { fetchProfileCount: handle => fetchLuoguProfileCount(http, handle) }),
+    luogu: Object.assign(createLuoguAdapter(http), { fetchProfileCount: handle => fetchLuoguProfileCount(http, handle, {
+      onSource: origin => console.log(`洛谷：采用 ${new URL(origin).hostname} 公开主页数据`),
+    }) }),
     atcoder: createAtcoderAdapter(undefined, http),
   };
 }
 
-export async function fetchLuoguProfileCount(http, handle) {
-  const response = await fetchWithChallenge(http, `https://www.luogu.com.cn/user/${encodeURIComponent(handle)}`, '', undefined, {
-    'x-lentille-request': 'content-only', Accept: 'application/json',
-  });
-  if (!response.ok) throw new Error(`洛谷公开主页 HTTP ${response.status}；可配置 LUOGU_COOKIE 使用提交记录通道`);
-  let data;
-  try { data = await response.json(); }
-  catch { throw new Error('洛谷公开主页未返回有效 JSON；可配置 LUOGU_COOKIE 使用提交记录通道'); }
-  const user = data.data?.user ?? data.currentData?.user;
-  if (String(user?.uid) !== handle || !Number.isSafeInteger(user?.passedProblemCount) || user.passedProblemCount < 0) {
-    throw new Error('洛谷公开主页用户不匹配或通过题数不可见；可配置 LUOGU_COOKIE 使用提交记录通道');
+export async function fetchLuoguProfileCount(http, handle, { onSource = () => {} } = {}) {
+  const failures = [];
+  // Both are official public profiles. Never send the user's login cookie to this fallback.
+  for (const origin of ['https://www.luogu.com.cn', 'https://www.luogu.com']) {
+    try {
+      const response = await fetchWithChallenge(http, `${origin}/user/${encodeURIComponent(handle)}`, '', undefined, {
+        'x-lentille-request': 'content-only', Accept: 'application/json', Referer: `${origin}/`,
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      let data;
+      try { data = await response.json(); }
+      catch { throw new Error('未返回有效 JSON'); }
+      const user = data.data?.user ?? data.currentData?.user;
+      if (String(user?.uid) !== handle || !Number.isSafeInteger(user?.passedProblemCount) || user.passedProblemCount < 0) {
+        throw new Error('用户不匹配或通过题数不可见');
+      }
+      onSource(origin);
+      return user.passedProblemCount;
+    } catch (error) {
+      failures.push(`${new URL(origin).hostname}: ${error.message}`);
+    }
   }
-  return user.passedProblemCount;
+  throw new Error(`洛谷公开主页暂不可用（${failures.join('；')}）`);
+}
+
+function profileSnapshot(handle, count, now) {
+  if (!Number.isSafeInteger(count) || count < 0) throw new Error('洛谷主页通过题数格式不正确');
+  return { ...emptyAccount(handle), snapshotCount: count, countSource: 'luogu-profile', complete: true, pending: false, status: 'ok', lastSuccessAt: now };
 }
 
 export async function syncStats(config, previous, adapters, { env = process.env, now = new Date().toISOString(), full = false, log = () => {} } = {}) {
@@ -131,8 +148,7 @@ export async function syncStats(config, previous, adapters, { env = process.env,
         if (!adapters.luogu?.fetchProfileCount) throw new Error('需配置 LUOGU_COOKIE 或启用公开主页统计通道');
         log('洛谷：正在获取公开主页通过题数');
         const count = await adapters.luogu.fetchProfileCount(handle);
-        if (!Number.isSafeInteger(count) || count < 0) throw new Error('洛谷主页通过题数格式不正确');
-        state.platforms[key] = { ...emptyAccount(handle), snapshotCount: count, countSource: 'luogu-profile', complete: true, pending: false, status: 'ok', lastSuccessAt: now };
+        state.platforms[key] = profileSnapshot(handle, count, now);
         continue;
       }
       delete account.snapshotCount;
@@ -178,6 +194,16 @@ export async function syncStats(config, previous, adapters, { env = process.env,
         }
       }
     } catch (error) {
+      if (key === 'luogu' && env.LUOGU_COOKIE && adapters.luogu?.fetchProfileCount) {
+        log('洛谷：提交记录通道未成功，尝试公开主页统计');
+        try {
+          const count = await adapters.luogu.fetchProfileCount(handle);
+          state.platforms[key] = profileSnapshot(handle, count, now);
+          continue;
+        } catch (fallbackError) {
+          error = new Error(`${safeError(error, env)}；公开主页也未成功：${safeError(fallbackError, env)}`);
+        }
+      }
       // A failed batch must not replace a previous successful batch or another account's data.
       account = succeeded ? state.platforms[key] : old;
       state.platforms[key] = { ...account, status: 'error', error: safeError(error, env) };

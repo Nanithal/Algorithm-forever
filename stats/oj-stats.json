@@ -1191,7 +1191,7 @@
       "pending": false,
       "page": 1,
       "cursor": "2026-11-17T14:58:05.000Z",
-      "lastSuccessAt": "2026-11-18T04:06:26.682Z",
+      "lastSuccessAt": "2026-11-18T05:11:51.191Z",
       "status": "ok",
       "notes": []
     },
@@ -1785,7 +1785,7 @@
       "pending": false,
       "page": 1,
       "cursor": "2026-11-11T05:55:13.000Z",
-      "lastSuccessAt": "2026-11-18T04:06:26.682Z",
+      "lastSuccessAt": "2026-11-18T05:11:51.191Z",
       "status": "ok",
       "notes": []
     },
@@ -3747,7 +3747,7 @@
       "pending": false,
       "page": 1,
       "cursor": "2026-10-21T01:50:08.000Z",
-      "lastSuccessAt": "2026-11-18T04:06:26.682Z",
+      "lastSuccessAt": "2026-11-18T05:11:51.191Z",
       "status": "ok",
       "notes": []
     },
@@ -3759,10 +3759,11 @@
       "page": 1,
       "cursor": null,
       "lastSuccessAt": "2026-11-18T04:06:26.682Z",
-      "status": "ok",
+      "status": "error",
       "notes": [],
       "snapshotCount": 258,
-      "countSource": "luogu-profile"
+      "countSource": "luogu-profile",
+      "error": "洛谷公开主页 HTTP 403；可配置 LUOGU_COOKIE 使用提交记录通道"
     }
   }
 }

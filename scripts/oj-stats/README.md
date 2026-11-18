@@ -19,7 +19,7 @@
 
 牛客 UID 取自 `https://ac.nowcoder.com/acm/contest/profile/数字UID`；洛谷 UID 取自 `https://www.luogu.com.cn/user/数字UID`。暂时不用的平台留空字符串，README 显示“未配置”，不会计为 0。
 
-洛谷默认通过上游的 HTTP／挑战处理模块读取公开个人主页的 `passedProblemCount`，无需 Cookie。中国站返回 403、非 JSON 或不可用数据时，会再尝试洛谷国际站 `www.luogu.com` 的同 UID 公开主页，核对账号编号和计数字段；这些公开请求不携带登录 Cookie。
+洛谷默认通过上游的 HTTP／挑战处理模块读取公开个人主页的 `passedProblemCount`，无需 Cookie。中国站返回 403、非 JSON 或不可用数据时，会再尝试洛谷国际站 `www.luogu.com` 的同 UID 公开主页，核对账号编号和计数字段；这些公开请求不携带登录 Cookie。普通请求都失败时，会使用系统自带 curl 再读取公开主页；保留 HTTPS 证书验证，最多 3 次 HTTPS 跳转，不传入登录 Cookie，也无需安装第三方依赖。
 
 若主页统计不可见，或希望改用提交记录通道，可以在 GitHub 仓库 **Settings → Secrets and variables → Actions → New repository secret** 添加可选 `LUOGU_COOKIE`。值为本人登录洛谷后的 Cookie，至少包含 `_uid` 和 `__client_id`；登录过期后更新同一个 Secret。配置 Cookie 后先获取提交记录，记录通道受限时回退到公开主页；所有通道都失败时保留旧缓存。Cookie 只放 Secret 或本地进程环境变量。
 

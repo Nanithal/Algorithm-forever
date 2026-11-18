@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateConfig, validateState, syncStats, solvedCount, renderStats, replaceStats, fetchLuoguProfileCount, START, END } from './update.mjs';
+import { validateConfig, validateState, syncStats, solvedCount, renderStats, replaceStats, fetchLuoguProfileCount, fetchLuoguWithCurl, START, END } from './update.mjs';
 import { createCodeforcesAdapter } from './vendor/icpc-workbench/server/src/adapters/codeforces.ts';
 import { createAtcoderAdapter } from './vendor/icpc-workbench/server/src/adapters/atcoder.ts';
 import { createLuoguAdapter } from './vendor/icpc-workbench/server/src/adapters/luogu.ts';
@@ -85,6 +85,36 @@ test('Luogu can use public totals when the authenticated submission endpoint is 
   assert.equal(state.platforms.luogu.countSource, 'luogu-profile');
   assert.equal(solvedCount(state.platforms.luogu), 258);
   assert.equal(state.platforms.luogu.lastSuccessAt, NOW);
+});
+
+test('the standard system client uses HTTPS and never receives a login cookie', async () => {
+  const result = await fetchLuoguWithCurl('2056356', {
+    pause: async () => {},
+    execute: async (command, args) => {
+      assert.equal(command, 'curl');
+      assert.equal(args[args.indexOf('--cookie') + 1], '');
+      assert.equal(args[args.indexOf('--proto') + 1], '=https');
+      assert.equal(args[args.indexOf('--proto-redir') + 1], '=https');
+      assert(!args.includes('--insecure'));
+      assert(!args.some(value => value.includes('__client_id')));
+      return { stdout: JSON.stringify({ data: { user: { uid: 2056356, passedProblemCount: 258 } } }) + '\n200\nhttps://www.luogu.com.cn/user/2056356' };
+    },
+  });
+  assert.deepEqual(result, { count: 258, origin: 'https://www.luogu.com.cn' });
+});
+
+test('the system client rejects responses for a different user', async () => {
+  await assert.rejects(fetchLuoguWithCurl('2056356', { pause: async () => {}, execute: async () => ({
+    stdout: JSON.stringify({ data: { user: { uid: 1, passedProblemCount: 258 } } }) + '\n200\nhttps://www.luogu.com.cn/user/2056356',
+  }) }), /用户不匹配/);
+});
+
+test('the public profile resolver tries the system client only after ordinary requests fail', async () => {
+  let calls = 0;
+  const count = await fetchLuoguProfileCount(async () => new Response('Forbidden', { status: 403 }), '2056356', {
+    publicFallback: async () => { calls++; return { count: 258, origin: 'https://www.luogu.com' }; },
+  });
+  assert.equal(count, 258); assert.equal(calls, 1);
 });
 
 test('Luogu preserves an old snapshot when both authenticated and public access fail', async () => {

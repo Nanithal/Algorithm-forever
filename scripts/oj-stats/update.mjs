@@ -3,11 +3,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { createCodeforcesAdapter } from './vendor/icpc-workbench/server/src/adapters/codeforces.ts';
 import { createAtcoderAdapter } from './vendor/icpc-workbench/server/src/adapters/atcoder.ts';
 import { createNowcoderAdapter } from './vendor/icpc-workbench/server/src/adapters/nowcoder.ts';
 import { createLuoguAdapter, fetchWithChallenge } from './vendor/icpc-workbench/server/src/adapters/luogu.ts';
-import { createHttpClient, PROD_RETRY } from './vendor/icpc-workbench/server/src/adapters/http.ts';
+import { createHttpClient, PROD_RETRY, sleep } from './vendor/icpc-workbench/server/src/adapters/http.ts';
 import { throttledFetch } from './vendor/icpc-workbench/server/src/net/hostThrottle.ts';
 
 export const START = '<!-- OJ-STATS:START -->';
@@ -99,13 +101,54 @@ export function createAdapters() {
     codeforces: createCodeforcesAdapter(http),
     nowcoder: createNowcoderAdapter(http),
     luogu: Object.assign(createLuoguAdapter(http), { fetchProfileCount: handle => fetchLuoguProfileCount(http, handle, {
-      onSource: origin => console.log(`洛谷：采用 ${new URL(origin).hostname} 公开主页数据`),
+      onSource: (origin, client = 'fetch') => console.log(`洛谷：采用 ${new URL(origin).hostname} 公开主页数据（${client}）`),
+      publicFallback: fetchLuoguWithCurl,
     }) }),
     atcoder: createAtcoderAdapter(undefined, http),
   };
 }
 
-export async function fetchLuoguProfileCount(http, handle, { onSource = () => {} } = {}) {
+function profileCountFromData(data, handle) {
+  const user = data.data?.user ?? data.currentData?.user;
+  if (String(user?.uid) !== handle || !Number.isSafeInteger(user?.passedProblemCount) || user.passedProblemCount < 0) {
+    throw new Error('用户不匹配或通过题数不可见');
+  }
+  return user.passedProblemCount;
+}
+
+const executeFile = promisify(execFile);
+
+export async function fetchLuoguWithCurl(handle, { execute = executeFile, pause = sleep } = {}) {
+  if (!/^[1-9]\d*$/.test(handle)) throw new Error('洛谷 UID 格式不正确');
+  const failures = [];
+  for (const origin of ['https://www.luogu.com.cn', 'https://www.luogu.com']) {
+    await pause(4000);
+    try {
+      // A standard system HTTP client, with normal TLS verification and an empty cookie jar.
+      // Only public profile data is requested; no login credentials are passed to curl.
+      const args = [
+        '--disable', '--silent', '--show-error', '--max-time', '20',
+        '--location', '--max-redirs', '3', '--proto', '=https', '--proto-redir', '=https',
+        '--cookie', '', '--user-agent', 'Algorithm-forever-statistics/1.0',
+        '--header', 'Accept: application/json', '--header', 'x-lentille-request: content-only',
+        '--write-out', '\n%{http_code}\n%{url_effective}', '--url', `${origin}/user/${handle}`,
+      ];
+      const { stdout } = await execute('curl', args, { encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 });
+      const lines = stdout.trimEnd().split(/\r?\n/);
+      const effective = new URL(lines.pop());
+      const status = lines.pop();
+      if (effective.protocol !== 'https:' || !['www.luogu.com.cn', 'www.luogu.com'].includes(effective.hostname)) throw new Error('返回了非预期的公开主页地址');
+      if (status !== '200') throw new Error(`系统 curl HTTP ${status}`);
+      const count = profileCountFromData(JSON.parse(lines.join('\n')), handle);
+      return { count, origin: effective.origin };
+    } catch (error) {
+      failures.push(`${new URL(origin).hostname}: ${error.code === 'ENOENT' ? '系统 curl 不可用' : error.message}`);
+    }
+  }
+  throw new Error(failures.join('；'));
+}
+
+export async function fetchLuoguProfileCount(http, handle, { onSource = () => {}, publicFallback } = {}) {
   const failures = [];
   // Both are official public profiles. Never send the user's login cookie to this fallback.
   for (const origin of ['https://www.luogu.com.cn', 'https://www.luogu.com']) {
@@ -117,14 +160,21 @@ export async function fetchLuoguProfileCount(http, handle, { onSource = () => {}
       let data;
       try { data = await response.json(); }
       catch { throw new Error('未返回有效 JSON'); }
-      const user = data.data?.user ?? data.currentData?.user;
-      if (String(user?.uid) !== handle || !Number.isSafeInteger(user?.passedProblemCount) || user.passedProblemCount < 0) {
-        throw new Error('用户不匹配或通过题数不可见');
-      }
+      const count = profileCountFromData(data, handle);
       onSource(origin);
-      return user.passedProblemCount;
+      return count;
     } catch (error) {
       failures.push(`${new URL(origin).hostname}: ${error.message}`);
+    }
+  }
+  if (publicFallback) {
+    try {
+      const { count, origin } = await publicFallback(handle);
+      if (!Number.isSafeInteger(count) || count < 0) throw new Error('系统客户端返回无效计数');
+      onSource(origin, 'curl');
+      return count;
+    } catch (error) {
+      failures.push(error.message);
     }
   }
   throw new Error(`洛谷公开主页暂不可用（${failures.join('；')}）`);

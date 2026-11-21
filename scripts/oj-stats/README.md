@@ -25,7 +25,7 @@
 
 AtCoder 默认用 kenkoooo 社区镜像，无需 Cookie。可选 Secret `ATCODER_COOKIE` 用于适配器的本人比赛提交补充扫描；不配置也能使用主通道。
 
-配置、脚本、第三方适配器、缓存和完整执行工作流保存在 `automation` 分支；`main` 仅保留算法源码、展示用 README 和很小的定时入口。将两个分支推送到 GitHub 后，打开 **Actions → Update OJ statistics → Run workflow**。默认每天北京时间 08:17 左右运行，实际时间受 GitHub 调度影响。GitHub 定时入口必须存在于默认分支，因此 main 中的这个入口文件需要保留。
+配置、脚本、第三方适配器、缓存和完整执行工作流保存在 `automation` 分支；`main` 仅保留算法源码、展示用 README 和很小的定时入口。将两个分支推送到 GitHub 后，打开 **Actions → Update OJ statistics → Run workflow**。默认每天北京时间 08:23 左右运行，实际时间受 GitHub 调度影响。GitHub 定时入口必须存在于默认分支，因此 main 中的这个入口文件需要保留。入口工作流文件推送到 main 后也会执行一次，便于及时发现配置问题；README 自动提交不会触发这一入口。
 
 入口通过 `workflow_call` 调用 automation 分支：分别检出两个分支，从 automation 读取配置和缓存，向 main 的 README 写入统计，再把缓存提交回 automation。使用内置 `GITHUB_TOKEN`，无需额外 PAT；如分支保护禁止机器人直接推送，需要按仓库规则允许工作流写入。
 

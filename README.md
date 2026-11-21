@@ -22,7 +22,7 @@
 洛谷采用公开主页显示的通过题数；其他平台按可获取的提交记录统计。
 <!-- OJ-STATS:END -->
 
-统计每天由 GitHub Actions 自动更新，也可以[手动触发](https://github.com/Nanithal/Algorithm-forever/actions/workflows/update-oj-stats.yml)。完整工具保存在 [automation 分支](https://github.com/Nanithal/Algorithm-forever/tree/automation)，配置方法见[统计工具说明](https://github.com/Nanithal/Algorithm-forever/blob/automation/scripts/oj-stats/README.md)。
+统计每天由 GitHub Actions 自动更新，也可以[手动触发](https://github.com/Nanithal/Algorithm-forever/actions/workflows/daily-oj-stats.yml)。完整工具保存在 [automation 分支](https://github.com/Nanithal/Algorithm-forever/tree/automation)，配置方法见[统计工具说明](https://github.com/Nanithal/Algorithm-forever/blob/automation/scripts/oj-stats/README.md)。
 
 ## 代码目录
 

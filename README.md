@@ -9,10 +9,10 @@
 <!-- OJ-STATS:START -->
 | 平台 | 账号 | 已通过题数 | 同步状态 | 最近成功同步（北京时间） |
 | :-- | :-- | --: | :-- | :-- |
-| Codeforces | [yuxoxo](https://codeforces.com/profile/yuxoxo) | 73 | 已同步 | 2026-11-21 11:30 |
-| 牛客 | [931614431](https://ac.nowcoder.com/acm/contest/profile/931614431) | 141 | 已同步 | 2026-11-21 11:30 |
-| 洛谷 | [2056356](https://www.luogu.com.cn/user/2056356) | 258 | 已同步 | 2026-11-21 11:30 |
-| AtCoder | [Xuyo](https://atcoder.jp/users/Xuyo) | 38 | 已同步 | 2026-11-21 11:30 |
+| Codeforces | [yuxoxo](https://codeforces.com/profile/yuxoxo) | 73 | 已同步 | 2026-11-21 11:41 |
+| 牛客 | [931614431](https://ac.nowcoder.com/acm/contest/profile/931614431) | 141 | 已同步 | 2026-11-21 11:41 |
+| 洛谷 | [2056356](https://www.luogu.com.cn/user/2056356) | 258 | 已同步 | 2026-11-21 11:41 |
+| AtCoder | [Xuyo](https://atcoder.jp/users/Xuyo) | 38 | 已同步 | 2026-11-21 11:41 |
 
 已获取合计：**510**。同一平台按题目去重，跨平台分别计数。
 

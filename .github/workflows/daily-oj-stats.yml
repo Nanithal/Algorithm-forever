@@ -7,7 +7,6 @@ on:
       - '.github/workflows/daily-oj-stats.yml'
   schedule:
     - cron: '23 0 * * *' # 北京时间每天 08:23
-    - cron: '*/5 * * * *' # 临时验证调度，验证后移除
   workflow_dispatch:
     inputs:
       full:

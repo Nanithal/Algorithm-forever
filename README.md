@@ -9,12 +9,12 @@
 <!-- OJ-STATS:START -->
 | 平台 | 账号 | 已通过题数 | 同步状态 | 最近成功同步（北京时间） |
 | :-- | :-- | --: | :-- | :-- |
-| Codeforces | [yuxoxo](https://codeforces.com/profile/yuxoxo) | 69 | 已同步 | 2026-11-18 16:35 |
-| 牛客 | [931614431](https://ac.nowcoder.com/acm/contest/profile/931614431) | 135 | 已同步 | 2026-11-18 16:35 |
-| 洛谷 | [2056356](https://www.luogu.com.cn/user/2056356) | 258 | 已同步 | 2026-11-18 16:35 |
-| AtCoder | [Xuyo](https://atcoder.jp/users/Xuyo) | 38 | 已同步 | 2026-11-18 16:35 |
+| Codeforces | [yuxoxo](https://codeforces.com/profile/yuxoxo) | 73 | 已同步 | 2026-11-23 15:55 |
+| 牛客 | [931614431](https://ac.nowcoder.com/acm/contest/profile/931614431) | 141 | 已同步 | 2026-11-23 15:55 |
+| 洛谷 | [2056356](https://www.luogu.com.cn/user/2056356) | 258 | 已同步 | 2026-11-23 15:55 |
+| AtCoder | [Xuyo](https://atcoder.jp/users/Xuyo) | 38 | 已同步 | 2026-11-23 15:55 |
 
-已获取合计：**500**。同一平台按题目去重，跨平台分别计数。
+已获取合计：**510**。同一平台按题目去重，跨平台分别计数。
 
 数据由 [icpc-workbench](https://github.com/ZF3373/icpc-workbench) 平台适配器获取；AtCoder 使用社区镜像，可能有收录延迟。
 “≥”表示历史记录尚未拉完、来源受限或部分平台未取得数据；失败时显示上次成功缓存。
@@ -22,7 +22,7 @@
 洛谷采用公开主页显示的通过题数；其他平台按可获取的提交记录统计。
 <!-- OJ-STATS:END -->
 
-统计每天由 GitHub Actions 自动更新，也可以[手动触发](https://github.com/Nanithal/Algorithm-forever/actions/workflows/update-oj-stats.yml)。完整工具保存在 [automation 分支](https://github.com/Nanithal/Algorithm-forever/tree/automation)，配置方法见[统计工具说明](https://github.com/Nanithal/Algorithm-forever/blob/automation/scripts/oj-stats/README.md)。
+统计每天由 GitHub Actions 自动更新，也可以[手动触发](https://github.com/Nanithal/Algorithm-forever/actions/workflows/daily-oj-stats.yml)。完整工具保存在 [automation 分支](https://github.com/Nanithal/Algorithm-forever/tree/automation)，配置方法见[统计工具说明](https://github.com/Nanithal/Algorithm-forever/blob/automation/scripts/oj-stats/README.md)。
 
 ## 代码目录
 

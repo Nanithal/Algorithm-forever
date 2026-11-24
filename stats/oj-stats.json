@@ -1215,7 +1215,7 @@
       "pending": false,
       "page": 1,
       "cursor": "2026-11-20T07:14:21.000Z",
-      "lastSuccessAt": "2026-11-23T07:55:57.740Z",
+      "lastSuccessAt": "2026-11-24T10:09:13.948Z",
       "status": "ok",
       "notes": []
     },
@@ -1809,7 +1809,7 @@
       "pending": false,
       "page": 1,
       "cursor": "2026-11-11T05:55:13.000Z",
-      "lastSuccessAt": "2026-11-23T07:55:57.740Z",
+      "lastSuccessAt": "2026-11-24T10:09:13.948Z",
       "status": "ok",
       "notes": []
     },
@@ -3849,13 +3849,31 @@
           "307134",
           "AC",
           "2026-11-19T14:25:09.000Z"
+        ],
+        [
+          "85679758",
+          "306811",
+          "AC",
+          "2026-11-23T13:38:02.000Z"
+        ],
+        [
+          "85679892",
+          "306811",
+          "AC",
+          "2026-11-23T13:46:22.000Z"
+        ],
+        [
+          "85679898",
+          "306811",
+          "AC",
+          "2026-11-23T13:46:35.000Z"
         ]
       ],
       "complete": true,
       "pending": false,
       "page": 1,
-      "cursor": "2026-11-19T14:25:09.000Z",
-      "lastSuccessAt": "2026-11-23T07:55:57.740Z",
+      "cursor": "2026-11-23T13:46:35.000Z",
+      "lastSuccessAt": "2026-11-24T10:09:13.948Z",
       "status": "ok",
       "notes": []
     },
@@ -3866,7 +3884,7 @@
       "pending": false,
       "page": 1,
       "cursor": null,
-      "lastSuccessAt": "2026-11-23T07:55:57.740Z",
+      "lastSuccessAt": "2026-11-24T10:09:13.948Z",
       "status": "ok",
       "notes": [],
       "snapshotCount": 258,

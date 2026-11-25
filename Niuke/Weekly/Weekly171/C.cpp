@@ -11,57 +11,27 @@ const int N = 2e5 + 1;
 const int INF = 0x3f3f3f3f;
 const ll INFF = 0x3f3f3f3f3f3f3f3f;
 
-int a[N], sum[N], pre[N];
-vector<vector<int>> sa(2 * N);
+ll cnt[4 * N + 5];
+
 void solve()
 {
-  int n, k, sum = 0, ans = 0;
-  string s;
+  int n, k;
+  ll ans = 0;
   cin >> n >> k;
+  string s;
   cin >> s;
-  s = ' ' + s;
-  for (int i = 1; i <= n; i++)
+  int pre = 2 * N;
+  cnt[pre] = 1;
+  for (int i = 0; i < n; i++)
   {
-    if (s[i] == '0')
-      sum += -1;
+    if (s[i] == '1')
+      pre += 1;
     else
-      sum += 1;
-    pre[i] = sum + N;
-    sa[sum + N].push_back(i);
-  }
-  pre[0] = N;
-  for (int i = 0; i <= n; i++)
-  {
-    int base = pre[i];
-    if (sa[base + k].size() != 0)
-    {
-      int size = sa[base + k].size();
-      int turn = 1;
-      for (auto p : sa[base + k])
-      {
-        if (p > i)
-        {
-          ans += size - turn + 1;
-          break;
-        }
-        turn++;
-      }
-    }
-
-    if (k != 0 && sa[base - k].size() != 0)
-    {
-      int size = sa[base - k].size();
-      int turn = 1;
-      for (auto p : sa[base - k])
-      {
-        if (p > i)
-        {
-          ans += size - turn + 1;
-          break;
-        }
-        turn++;
-      }
-    }
+      pre += -1;
+    ans += cnt[pre + k];
+    if (k != 0)
+      ans += cnt[pre - k];
+    cnt[pre]++;
   }
   cout << ans << endl;
 }
@@ -70,11 +40,13 @@ int main()
 {
   ios::sync_with_stdio(0);
   cin.tie(0);
+
   int t = 1;
-  //   cin >> t;
+
   while (t--)
   {
     solve();
   }
+
   return 0;
 }

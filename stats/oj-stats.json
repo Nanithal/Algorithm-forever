@@ -1215,7 +1215,7 @@
       "pending": false,
       "page": 1,
       "cursor": "2026-11-20T07:14:21.000Z",
-      "lastSuccessAt": "2026-11-26T08:40:39.473Z",
+      "lastSuccessAt": "2026-11-27T08:51:48.932Z",
       "status": "ok",
       "notes": []
     },
@@ -1851,7 +1851,7 @@
       "pending": false,
       "page": 1,
       "cursor": "2026-11-25T14:13:05.000Z",
-      "lastSuccessAt": "2026-11-26T08:40:39.473Z",
+      "lastSuccessAt": "2026-11-27T08:51:48.932Z",
       "status": "ok",
       "notes": []
     },
@@ -3987,7 +3987,7 @@
       "pending": false,
       "page": 1,
       "cursor": "2026-11-25T12:25:07.000Z",
-      "lastSuccessAt": "2026-11-26T08:40:39.473Z",
+      "lastSuccessAt": "2026-11-27T08:51:48.932Z",
       "status": "ok",
       "notes": []
     },
@@ -3998,7 +3998,7 @@
       "pending": false,
       "page": 1,
       "cursor": null,
-      "lastSuccessAt": "2026-11-26T08:40:39.473Z",
+      "lastSuccessAt": "2026-11-27T08:51:48.932Z",
       "status": "ok",
       "notes": [],
       "snapshotCount": 258,
